@@ -1,18 +1,58 @@
+$color1: #282c34;
+
 .App {
   text-align: center;
+  background-color: $color1;
+  height: 100vh;
+  width: 100vw;
 }
 
-.App-header {
-  background-color: #282c34;
-  min-height: 100vh;
+.App-content {
   display: flex;
+  height: auto;
   flex-direction: column;
   align-items: center;
-  justify-content: center;
-  font-size: calc(10px + 2vmin);
+  justify-content: flex-start;
   color: white;
+
+  & h1 {
+    font-size: calc(10px + 2vmin);
+  }
 }
 
-.App-link {
-  color: #61dafb;
+input[type="text"] {
+  font-size: 1em;
+
+  min-width: 300px;
+  min-height: 22px;
+
+  margin-top: 7px;
+
+  &:hover,
+  &:focus {
+    outline: 1px solid white;
+  }
+}
+
+input[type="button"],
+input[type="submit"],
+input[type="reset"] {
+  margin-top: 7px;
+  font-size: 1em;
+
+  min-width: 100px;
+  min-height: 22px;
+
+  outline: 1px white;
+
+  background-color: white;
+  border: none;
+  text-decoration: none;
+  color: $color1;
+  cursor: pointer;
+
+  &:hover,
+  &:focus {
+    outline: 1px solid white;
+  }
 }
