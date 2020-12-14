@@ -1,11 +1,10 @@
 import Fluence from "fluence";
 import { build } from "fluence/dist/particle";
 import { ServiceMultiple } from "fluence/dist/service";
-import { registerService } from "fluence/dist/globalState";
+import { registerService, deleteService } from "fluence/dist/globalState";
 import { peerIdToSeed, seedToPeerId } from "fluence/dist/seed";
-import { Action, State } from "src/appState";
+import { Action, Person, State } from "src/appState";
 import { FluenceClient } from "fluence/dist/fluenceClient";
-import { strictEqual } from "assert";
 
 export const hostServiceId = "collabServiceHost";
 export const guestServiceId = "collabServiceGuest";
@@ -22,12 +21,27 @@ export const createHostService = async (
 ) => {
   const service = new ServiceMultiple(hostServiceId);
 
-  service.registerFunction("login", (args: any[]) => {
+  service.registerFunction("join", (args: any[]) => {
     const [userName, peer] = args;
     dispatch({
       type: "newUser",
       payload: {
         name: userName,
+        peer: peer,
+      },
+    });
+
+    return {
+      peopleInChat: state.roomContent.people,
+      initialText: state.roomContent.text,
+    };
+  });
+
+  service.registerFunction("leave", (args: any[]) => {
+    const [peer] = args;
+    dispatch({
+      type: "userLeft",
+      payload: {
         peer: peer,
       },
     });
@@ -62,8 +76,8 @@ export const createGuestService = async (
   service.registerFunction("notifyPeopleListChanged", (args: any[]) => {
     const [people] = args;
     dispatch({
-      type: "changePeople",
-      value: people,
+      type: "changeRoomState",
+      people: people,
     });
 
     return {};
@@ -91,10 +105,37 @@ export const joinRoom = async (
   let script = `
   (seq 
     (call relay ("op" "identity") [])
-    (call remotePeerId (serviceId "login") [name peer] result))`;
+    (call remotePeerId (serviceId "join") [name peer] result))`;
 
   const data = new Map();
   data.set("name", name);
+  data.set("peer", myPeer);
+  data.set("serviceId", hostServiceId);
+  data.set("relay", client.connection.nodePeerId.toB58String());
+  data.set("remotePeerId", remotePeerId.toB58String());
+
+  let particle = await build(client.selfPeerId, script, data);
+  await client.executeParticle(particle);
+};
+
+export const deleteServices = (...services) => {
+  for (let service of services) {
+    if (service) {
+      deleteService(service);
+    }
+  }
+};
+
+export const leaveRoom = async (client: FluenceClient, remotePeer: string) => {
+  const remotePeerId = await seedToPeerId(remotePeer);
+  const myPeer = peerIdToSeed(client.selfPeerId);
+
+  let script = `
+  (seq 
+    (call relay ("op" "identity") [])
+    (call remotePeerId (serviceId "leave") [peer] result))`;
+
+  const data = new Map();
   data.set("peer", myPeer);
   data.set("serviceId", hostServiceId);
   data.set("relay", client.connection.nodePeerId.toB58String());
@@ -128,6 +169,38 @@ export const notifyTextChanged = async (
 
   const data = new Map();
   data.set("text", text);
+  data.set("serviceId", guestServiceId);
+  data.set("relay", client.connection.nodePeerId.toB58String());
+  data.set("remotePeerId", remotePeerId.toB58String());
+
+  let particle = await build(client.selfPeerId, script, data);
+  await client.executeParticle(particle);
+};
+
+export const notifyAllPeopleChanged = (state: State, people: Array<Person>) => {
+  if (!state.fluenceClient) {
+    return;
+  }
+
+  for (let p of state.roomContent.people) {
+    notifyPeopleChanged(state.fluenceClient, p.peerId, people);
+  }
+};
+
+export const notifyPeopleChanged = async (
+  client: FluenceClient,
+  peer: string,
+  people: Array<Person>
+) => {
+  const remotePeerId = await seedToPeerId(peer);
+
+  let script = `
+  (seq 
+    (call relay ("op" "identity") [])
+    (call remotePeerId (serviceId "notifyTextChanged") [people]))`;
+
+  const data = new Map();
+  data.set("people", people);
   data.set("serviceId", guestServiceId);
   data.set("relay", client.connection.nodePeerId.toB58String());
   data.set("remotePeerId", remotePeerId.toB58String());

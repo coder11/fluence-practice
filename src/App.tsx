@@ -4,7 +4,9 @@ import {
   createGuestService,
   createHostService,
   joinRoom,
+  leaveRoom,
   notifyAllTextChanged,
+  deleteServices,
 } from "./fluence/.";
 import "./App.scss";
 import Fluence from "fluence";
@@ -27,6 +29,11 @@ const connect = async (state: State, dispatch: React.Dispatch<Action>) => {
 const start = async (state: State, dispatch: React.Dispatch<Action>) => {
   const hostService = await createHostService(state, dispatch);
   dispatch({
+    type: "setServices",
+    hostService: hostService,
+  });
+
+  dispatch({
     type: "changeMode",
     value: "host",
   });
@@ -38,6 +45,11 @@ const doJoinRoom = async (state: State, dispatch: React.Dispatch<Action>) => {
   }
 
   const guestService = await createGuestService(state, dispatch);
+  dispatch({
+    type: "setServices",
+    guestService: guestService,
+  });
+
   await joinRoom(state, dispatch);
 
   dispatch({
@@ -46,7 +58,19 @@ const doJoinRoom = async (state: State, dispatch: React.Dispatch<Action>) => {
   });
 };
 
-const back = (state: State, dispatch: React.Dispatch<Action>) => {
+const back = async (state: State, dispatch: React.Dispatch<Action>) => {
+  if (state.mode !== "host" && state.fluenceClient && state.form.remotePeer) {
+    await leaveRoom(state.fluenceClient!, state.form.remotePeer);
+  }
+
+  deleteServices(state.guestService, state.hostService);
+
+  dispatch({
+    type: "changeText",
+    value: "",
+    isRemote: true,
+  });
+
   dispatch({
     type: "changeMode",
     value: "login",

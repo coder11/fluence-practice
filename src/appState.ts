@@ -21,20 +21,28 @@ export type State = {
   };
 };
 
+type Mode = "login" | "host" | "guest";
+
+export type Person = {
+  name: string;
+  peerId: string;
+};
+
 export type Action =
   | { type: "connected"; client: FluenceClient }
-  | { type: "changeMode"; value: "login" | "host" | "guest" }
+  | { type: "setServices"; hostService?; guestService? }
+  | { type: "changeMode"; value: Mode }
   | { type: "set"; field: string; value: string }
   | { type: "setPeer"; peer: string }
   | { type: "changeText"; value: string; isRemote: boolean }
   | {
-      type: "changePeople";
-      value: Array<{
-        name: string;
-        peerId: string;
-      }>;
+      type: "changeRoomState";
+      mode?: Mode;
+      text?: string;
+      people?: Array<Person>;
     }
-  | { type: "newUser"; payload: { name: string; peer: string } };
+  | { type: "newUser"; payload: { name: string; peer: string } }
+  | { type: "userLeft"; payload: { peer: string } };
 
 export const initialState: State = {
   mode: "login",
@@ -61,6 +69,16 @@ export const reducer = (state: State, action: Action): State => {
     };
   }
 
+  if (action.type === "userLeft") {
+    return produce(state, (draft) => {
+      const newPeople = draft.roomContent.people.filter(
+        (x) => x.peerId !== action.payload.peer
+      );
+
+      draft.roomContent.people = newPeople;
+    });
+  }
+
   if (action.type === "newUser") {
     return produce(state, (draft) => {
       draft.roomContent.people.push({
@@ -74,6 +92,14 @@ export const reducer = (state: State, action: Action): State => {
     return {
       ...state,
       fluenceClient: action.client,
+    };
+  }
+
+  if (action.type === "setServices") {
+    return {
+      ...state,
+      hostService: action.hostService,
+      guestService: action.guestService,
     };
   }
 
@@ -100,9 +126,19 @@ export const reducer = (state: State, action: Action): State => {
     });
   }
 
-  if (action.type === "changePeople") {
+  if (action.type === "changeRoomState") {
     return produce(state, (draft) => {
-      draft.roomContent.people = action.value;
+      if (action.people) {
+        draft.roomContent.people = action.people;
+      }
+
+      if (action.mode) {
+        draft.mode = action.mode;
+      }
+
+      if (action.text) {
+        draft.roomContent.text = action.text;
+      }
     });
   }
 
