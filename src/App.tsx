@@ -1,29 +1,75 @@
-import React, { useEffect, useState } from "react";
-import { connectToRelay, createRoom, joinRoom } from "./fluence/.";
+import React, { useEffect, useReducer, useState } from "react";
+import {
+  connectToRelay,
+  createGuestService,
+  createHostService,
+  joinRoom,
+  notifyAllTextChanged,
+} from "./fluence/.";
 import "./App.scss";
 import Fluence from "fluence";
-import { FluenceClient } from "fluence/dist/fluenceClient";
 import { peerIdToSeed } from "fluence/dist/seed";
+import { reducer, initialState, State, Action } from "./appState";
 
-let state: any; //ReturnType<typeof createRoom> | undefined;
+const connect = async (state: State, dispatch: React.Dispatch<Action>) => {
+  if (!state.form.relay || !state.peer) {
+    return;
+  }
 
-let client: FluenceClient;
-
-const start = async () => {
-  state = await createRoom();
-  console.log(state);
-};
-
-const connect = async (relay, peerId: string) => {
-  client = await connectToRelay(relay, peerId);
+  const client = await connectToRelay(state.form.relay, state.peer!);
   console.log("conencted, ", client);
+  dispatch({
+    type: "connected",
+    client: client,
+  });
 };
 
-const doJoinRoom = async (remotePeerId, name) => {
-  await joinRoom(client, remotePeerId, name);
+const start = async (state: State, dispatch: React.Dispatch<Action>) => {
+  const hostService = await createHostService(state, dispatch);
+  dispatch({
+    type: "changeMode",
+    value: "host",
+  });
 };
 
-const usePeer = () => {
+const doJoinRoom = async (state: State, dispatch: React.Dispatch<Action>) => {
+  if (!state.fluenceClient || !state.form.remotePeer || !state.form.name) {
+    return;
+  }
+
+  const guestService = await createGuestService(state, dispatch);
+  await joinRoom(state, dispatch);
+
+  dispatch({
+    type: "changeMode",
+    value: "guest",
+  });
+};
+
+const back = (state: State, dispatch: React.Dispatch<Action>) => {
+  dispatch({
+    type: "changeMode",
+    value: "login",
+  });
+};
+
+const changeText = (
+  state: State,
+  dispatch: React.Dispatch<Action>,
+  newTextValue: string
+) => {
+  dispatch({
+    type: "changeText",
+    value: newTextValue,
+    isRemote: false,
+  });
+
+  if (state.mode === "host") {
+    notifyAllTextChanged(state, newTextValue);
+  }
+};
+
+const usePeer = (disptch: (peerId) => void) => {
   const [peerId, setPeerId] = useState<string | null>(null);
 
   useEffect(() => {
@@ -32,7 +78,11 @@ const usePeer = () => {
     }
 
     Fluence.generatePeerId()
-      .then((x) => setPeerId(peerIdToSeed(x)))
+      .then((x) => {
+        const p = peerIdToSeed(x);
+        setPeerId(p);
+        disptch(p);
+      })
       .catch((err) => {
         console.log("Couldn't get peer id", err);
       });
@@ -44,72 +94,134 @@ const usePeer = () => {
 };
 
 const App = () => {
-  const [relay, setRelay] = useState("");
-  const [remotePeerId, setRemotePeerId] = useState("");
-  const [name, setName] = useState("");
-  const peer = usePeer();
+  const [state, dispatch] = useReducer(reducer, initialState);
+  usePeer((x) => {
+    dispatch({
+      type: "setPeer",
+      peer: x,
+    });
+  });
+
+  const hasPeer = state.peer !== null;
+  const isConnected = hasPeer && state.fluenceClient !== undefined;
+  const canClickConnect = hasPeer && state.form.relay.length > 0;
+  const canCreateRoom = isConnected;
+  const canJoinRoom =
+    isConnected &&
+    state.form.remotePeer.length > 0 &&
+    state.form.name.length > 0;
+
+  const loginJsx = (
+    <div className="Login">
+      <h1>Server (relay)</h1>
+      <form
+        onSubmit={(e) => {
+          e.preventDefault();
+          connect(state, dispatch);
+        }}
+      >
+        <label>Relay:</label>
+        <input
+          type="text"
+          value={state.form.relay}
+          onChange={(e) =>
+            dispatch({
+              type: "set",
+              field: "relay",
+              value: e.target.value,
+            })
+          }
+        />
+        <div>
+          <input type="submit" value="Connect" disabled={!canClickConnect} />
+        </div>
+      </form>
+      <h1>Create new room</h1>
+      <form
+        onSubmit={(e) => {
+          e.preventDefault();
+          start(state, dispatch);
+        }}
+      >
+        <div>
+          <input type="submit" value="Create" disabled={!canCreateRoom} />
+        </div>
+      </form>
+      <br />
+      <h1>Join an existing room</h1>
+      <form
+        onSubmit={(e) => {
+          e.preventDefault();
+          doJoinRoom(state, dispatch);
+        }}
+      >
+        <div>
+          <label>Room peer id: </label>
+          <input
+            type="text"
+            value={state.form.remotePeer}
+            onChange={(e) =>
+              dispatch({
+                type: "set",
+                field: "remotePeer",
+                value: e.target.value,
+              })
+            }
+          />
+        </div>
+        <div>
+          <label>Name: </label>
+          <input
+            type="text"
+            value={state.form.name}
+            onChange={(e) =>
+              dispatch({
+                type: "set",
+                field: "name",
+                value: e.target.value,
+              })
+            }
+          />
+        </div>
+        <div>
+          <input type="submit" value="Join" disabled={!canJoinRoom} />
+        </div>
+      </form>
+    </div>
+  );
+
+  const appJsx = (
+    <>
+      <input
+        type="button"
+        value="Back"
+        onClick={(e) => back(state, dispatch)}
+      />
+      <div className="Container">
+        <div className="Code">
+          <textarea
+            value={state.roomContent.text}
+            onChange={(e) => changeText(state, dispatch, e.target.value)}
+          />
+        </div>
+        <div className="Right-pane">
+          <h1>People in the chat:</h1>
+          <ul>
+            {state.roomContent.people.map((person, index) => (
+              <li key={index}>
+                {person.name} ({person.peerId})
+              </li>
+            ))}
+          </ul>
+        </div>
+      </div>
+    </>
+  );
 
   return (
     <div className="App">
-      <div className="App-content">
-        <div>Your peerId: {peer || ""}</div>
-        <h1>Server (relay)</h1>
-        <form
-          onSubmit={(e) => {
-            e.preventDefault();
-            connect(relay, peer!);
-          }}
-        >
-          <label>Relay:</label>
-          <input
-            type="text"
-            value={relay}
-            onChange={(e) => setRelay(e.target.value)}
-          />
-          <div>
-            <input type="submit" value="Connect" />
-          </div>
-        </form>
-        <h1>Create new room</h1>
-        <form
-          onSubmit={(e) => {
-            e.preventDefault();
-            start();
-          }}
-        >
-          <div>
-            <input type="submit" value="Create" />
-          </div>
-        </form>
-        <br />
-        <h1>Join an existing room</h1>
-        <form
-          onSubmit={(e) => {
-            e.preventDefault();
-            doJoinRoom(remotePeerId, name);
-          }}
-        >
-          <div>
-            <label>Room peer id: </label>
-            <input
-              type="text"
-              value={remotePeerId}
-              onChange={(e) => setRemotePeerId(e.target.value)}
-            />
-          </div>
-          <div>
-            <label>Name: </label>
-            <input
-              type="text"
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-            />
-          </div>
-          <div>
-            <input type="submit" value="Join" />
-          </div>
-        </form>
-      </div>
+      <div className="Peer-id">Your peerId: {state.peer || ""}</div>
+      {state.mode === "login" ? loginJsx : appJsx}
     </div>
   );
 };
