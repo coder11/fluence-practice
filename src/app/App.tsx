@@ -1,97 +1,16 @@
-import React, { useEffect, useReducer, useState } from "react";
-import {
-  connectToRelay,
-  createGuestService,
-  createHostService,
-  joinRoom,
-  leaveRoom,
-  notifyAllTextChanged,
-  deleteServices,
-} from "./fluence/.";
 import "./App.scss";
+
+import React, { useEffect, useReducer, useState } from "react";
 import Fluence from "fluence";
 import { peerIdToSeed } from "fluence/dist/seed";
-import { reducer, initialState, State, Action } from "./appState";
-
-const connect = async (state: State, dispatch: React.Dispatch<Action>) => {
-  if (!state.form.relay || !state.peer) {
-    return;
-  }
-
-  const client = await connectToRelay(state.form.relay, state.peer!);
-  console.log("conencted, ", client);
-  dispatch({
-    type: "connected",
-    client: client,
-  });
-};
-
-const start = async (state: State, dispatch: React.Dispatch<Action>) => {
-  const hostService = await createHostService(state, dispatch);
-  dispatch({
-    type: "setServices",
-    hostService: hostService,
-  });
-
-  dispatch({
-    type: "changeMode",
-    value: "host",
-  });
-};
-
-const doJoinRoom = async (state: State, dispatch: React.Dispatch<Action>) => {
-  if (!state.fluenceClient || !state.form.remotePeer || !state.form.name) {
-    return;
-  }
-
-  const guestService = await createGuestService(state, dispatch);
-  dispatch({
-    type: "setServices",
-    guestService: guestService,
-  });
-
-  await joinRoom(state, dispatch);
-
-  dispatch({
-    type: "changeMode",
-    value: "guest",
-  });
-};
-
-const back = async (state: State, dispatch: React.Dispatch<Action>) => {
-  if (state.mode !== "host" && state.fluenceClient && state.form.remotePeer) {
-    await leaveRoom(state.fluenceClient!, state.form.remotePeer);
-  }
-
-  deleteServices(state.guestService, state.hostService);
-
-  dispatch({
-    type: "changeText",
-    value: "",
-    isRemote: true,
-  });
-
-  dispatch({
-    type: "changeMode",
-    value: "login",
-  });
-};
-
-const changeText = (
-  state: State,
-  dispatch: React.Dispatch<Action>,
-  newTextValue: string
-) => {
-  dispatch({
-    type: "changeText",
-    value: newTextValue,
-    isRemote: false,
-  });
-
-  if (state.mode === "host") {
-    notifyAllTextChanged(state, newTextValue);
-  }
-};
+import { reducer, initialState, Route } from "./appState";
+import {
+  doJoinRoom,
+  back,
+  changeText,
+  connect,
+  createRoom,
+} from "./interactions";
 
 const usePeer = (disptch: (peerId) => void) => {
   const [peerId, setPeerId] = useState<string | null>(null);
@@ -164,7 +83,7 @@ const App = () => {
       <form
         onSubmit={(e) => {
           e.preventDefault();
-          start(state, dispatch);
+          createRoom(state, dispatch);
         }}
       >
         <div>
@@ -242,11 +161,22 @@ const App = () => {
     </>
   );
 
+  const routeMap: Record<Route, JSX.Element> = {
+    create: loginJsx,
+    join: loginJsx,
+    settings: loginJsx,
+    app: appJsx,
+  };
+
   return (
-    <div className="App">
-      <div className="Peer-id">Your peerId: {state.peer || ""}</div>
-      {state.mode === "login" ? loginJsx : appJsx}
-    </div>
+    <>
+      <div className="Header">
+        <div>Back button</div>
+        <div>Your peerId: {state.peer || ""}</div>
+        <div>online status</div>
+      </div>
+      <div className="Main-content">{routeMap[state.route]}</div>
+    </>
   );
 };
 

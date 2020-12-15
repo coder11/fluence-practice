@@ -1,8 +1,13 @@
 import { FluenceClient } from "fluence/dist/fluenceClient";
 import produce from "immer";
 
+export type Route = "create" | "join" | "settings" | "app";
+
+type Mode = "host" | "guest";
+
 export type State = {
-  mode: "login" | "host" | "guest";
+  route: Route;
+  mode: Mode;
   peer: string | null;
   form: {
     relay: string;
@@ -21,8 +26,6 @@ export type State = {
   };
 };
 
-type Mode = "login" | "host" | "guest";
-
 export type Person = {
   name: string;
   peerId: string;
@@ -32,6 +35,7 @@ export type Action =
   | { type: "connected"; client: FluenceClient }
   | { type: "setServices"; hostService?; guestService? }
   | { type: "changeMode"; value: Mode }
+  | { type: "changeRoute"; value: Route }
   | { type: "set"; field: string; value: string }
   | { type: "setPeer"; peer: string }
   | { type: "changeText"; value: string; isRemote: boolean }
@@ -45,7 +49,8 @@ export type Action =
   | { type: "userLeft"; payload: { peer: string } };
 
 export const initialState: State = {
-  mode: "login",
+  route: "join",
+  mode: "host",
   peer: null,
   form: {
     // relay: "",
@@ -66,6 +71,13 @@ export const reducer = (state: State, action: Action): State => {
     return {
       ...state,
       mode: action.value,
+    };
+  }
+
+  if (action.type === "changeRoute") {
+    return {
+      ...state,
+      route: action.value,
     };
   }
 

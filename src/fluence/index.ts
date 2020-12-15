@@ -3,7 +3,7 @@ import { build } from "fluence/dist/particle";
 import { ServiceMultiple } from "fluence/dist/service";
 import { registerService, deleteService } from "fluence/dist/globalState";
 import { peerIdToSeed, seedToPeerId } from "fluence/dist/seed";
-import { Action, Person, State } from "src/appState";
+import { Action, Person, State } from "src/app/appState";
 import { FluenceClient } from "fluence/dist/fluenceClient";
 
 export const hostServiceId = "collabServiceHost";
