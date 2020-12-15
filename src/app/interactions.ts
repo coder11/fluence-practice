@@ -12,14 +12,11 @@ import "./App.scss";
 import { State, Action } from "./appState";
 
 export const connect = async (
-  state: State,
+  relay: string,
+  peer: string,
   dispatch: React.Dispatch<Action>
 ) => {
-  if (!state.form.relay || !state.peer) {
-    return;
-  }
-
-  const client = await connectToRelay(state.form.relay, state.peer!);
+  const client = await connectToRelay(relay, peer);
   console.log("conencted, ", client);
   dispatch({
     type: "connected",

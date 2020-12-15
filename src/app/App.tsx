@@ -11,30 +11,7 @@ import {
   connect,
   createRoom,
 } from "./interactions";
-
-const usePeer = (disptch: (peerId) => void) => {
-  const [peerId, setPeerId] = useState<string | null>(null);
-
-  useEffect(() => {
-    if (peerId) {
-      return;
-    }
-
-    Fluence.generatePeerId()
-      .then((x) => {
-        const p = peerIdToSeed(x);
-        setPeerId(p);
-        disptch(p);
-      })
-      .catch((err) => {
-        console.log("Couldn't get peer id", err);
-      });
-
-    return () => {};
-  });
-
-  return peerId;
-};
+import { connectToRelay } from "src/fluence";
 
 const Tab: React.FunctionComponent<{
   route: Route;
@@ -93,14 +70,22 @@ const TabNav: React.FunctionComponent<{
   );
 };
 
+const init = async (state, dispatch) => {
+  let p: any = await Fluence.generatePeerId();
+  p = peerIdToSeed(p);
+  dispatch({
+    type: "setPeer",
+    peer: p,
+  });
+
+  connect(state.form.relay, p, dispatch);
+};
+
 const App = () => {
   const [state, dispatch] = useReducer(reducer, initialState);
-  usePeer((x) => {
-    dispatch({
-      type: "setPeer",
-      peer: x,
-    });
-  });
+  useEffect(() => {
+    init(state, dispatch);
+  }, []);
 
   const hasPeer = state.peer !== null;
   const isConnected = hasPeer && state.fluenceClient !== undefined;
@@ -117,11 +102,12 @@ const App = () => {
       <form
         onSubmit={(e) => {
           e.preventDefault();
-          connect(state, dispatch);
+          connect(state.form.relay, state.form.remotePeer, dispatch);
         }}
       >
-        <label>Relay:</label>
+        <label className="label">Relay:</label>
         <input
+          className="text-input"
           type="text"
           value={state.form.relay}
           onChange={(e) =>
@@ -132,9 +118,13 @@ const App = () => {
             })
           }
         />
-        <div>
-          <input type="submit" value="Connect" disabled={!canClickConnect} />
-        </div>
+
+        <input
+          className="button"
+          type="submit"
+          value="Connect"
+          disabled={!canClickConnect}
+        />
       </form>
     </>
   );
@@ -149,8 +139,9 @@ const App = () => {
         }}
       >
         <div>
-          <label>Name: </label>
+          <label className="label">Name: </label>
           <input
+            className="text-input"
             type="text"
             value={state.form.name}
             onChange={(e) =>
@@ -163,7 +154,12 @@ const App = () => {
           />
         </div>
         <div>
-          <input type="submit" value="Create" disabled={!canCreateRoom} />
+          <input
+            className="button"
+            type="submit"
+            value="Create"
+            disabled={!canCreateRoom}
+          />
         </div>
       </form>
     </div>
@@ -179,8 +175,9 @@ const App = () => {
         }}
       >
         <div>
-          <label>Room peer id: </label>
+          <label className="label">Room peer id: </label>
           <input
+            className="text-input"
             type="text"
             value={state.form.remotePeer}
             onChange={(e) =>
@@ -193,8 +190,9 @@ const App = () => {
           />
         </div>
         <div>
-          <label>Name: </label>
+          <label className="label">Name: </label>
           <input
+            className="text-input"
             type="text"
             value={state.form.name}
             onChange={(e) =>
@@ -206,20 +204,19 @@ const App = () => {
             }
           />
         </div>
-        <div>
-          <input type="submit" value="Join" disabled={!canJoinRoom} />
-        </div>
+
+        <input
+          className="button"
+          type="submit"
+          value="Join"
+          disabled={!canJoinRoom}
+        />
       </form>
     </>
   );
 
   const appJsx = (
     <>
-      <input
-        type="button"
-        value="Back"
-        onClick={(e) => back(state, dispatch)}
-      />
       <div className="Code-container">
         <div className="Code">
           <textarea
@@ -228,14 +225,18 @@ const App = () => {
           />
         </div>
         <div className="Right-pane">
-          <h1>People in the chat:</h1>
-          <ul>
-            {state.roomContent.people.map((person, index) => (
-              <li key={index}>
-                {person.name} ({person.peerId})
-              </li>
-            ))}
-          </ul>
+          Code evaluation goes here (at least theoretically)
+          <div className="People-list">
+            <h1>People in the chat:</h1>
+            <ul>
+              {state.roomContent.people.map((person, index) => (
+                <li key={index}>
+                  <span className="Person-name">{person.name} </span>
+                  {/* <span className="Person-peer">({person.peerId})</span> */}
+                </li>
+              ))}
+            </ul>
+          </div>
         </div>
       </div>
     </>
@@ -251,9 +252,28 @@ const App = () => {
   return (
     <>
       <div className="Header">
-        <div>Back button</div>
+        <div>
+          {state.route === "app" && (
+            <input
+              className="back-button"
+              type="button"
+              value="Back"
+              onClick={(e) => back(state, dispatch)}
+            />
+          )}
+        </div>
         <div>Your peerId: {state.peer || ""}</div>
-        <div>online status</div>
+        <div
+          className="Online-status"
+          onClick={() => {
+            dispatch({
+              type: "changeRoute",
+              value: "settings",
+            });
+          }}
+        >
+          {state.fluenceClient ? "online" : "offline"}
+        </div>
       </div>
       <div className="Main-content">
         {state.route === "app" ? (
