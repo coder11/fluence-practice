@@ -1,9 +1,10 @@
 $color1: #282c34;
+$color2: lighten($color1, 15%);
 $header-height: 60px;
 
 .Header {
   height: $header-height;
-  background-color: lighten($color1, 15%);
+  background-color: $color2;
   color: white;
 
   font-family: "Montserrat", sans-serif;
@@ -23,20 +24,48 @@ $header-height: 60px;
   font-family: "Montserrat", sans-serif;
 }
 
-.Login {
-  display: flex;
-  height: auto;
-  flex-direction: column;
-  align-items: center;
-  justify-content: flex-start;
-  color: white;
+.Welcome-form {
+  display: inline-block;
+  margin-left: auto;
+  margin-right: auto;
+  margin-top: 100px;
 
-  & h1 {
-    font-size: calc(10px + 2vmin);
+  width: 600px;
+  height: auto;
+  min-height: 300px;
+  padding: 0 20px 20px 20px;
+  background-color: $color2;
+  box-sizing: padding-box;
+
+  border-radius: 10px;
+
+  color: white;
+}
+
+.Tab-container {
+  display: flex;
+  margin: 0 -20px;
+}
+
+.Tab {
+  text-align: center;
+  height: 40px;
+  line-height: 40px;
+  border-right: 1px solid white;
+  border-bottom: 1px solid white;
+  width: 100%;
+  cursor: pointer;
+
+  &--selected {
+    border-bottom: none;
+  }
+
+  &:last-of-type {
+    border-right: none;
   }
 }
 
-.Container {
+.Code-container {
   display: flex;
   margin-top: 20px;
 
@@ -76,10 +105,10 @@ $header-height: 60px;
 input[type="text"] {
   font-size: 0.75em;
 
-  min-width: 400px;
+  width: 100%;
   min-height: 22px;
 
-  margin-top: 7px;
+  margin-top: 5px;
 
   &:hover,
   &:focus {
@@ -87,10 +116,17 @@ input[type="text"] {
   }
 }
 
+label {
+  display: block;
+  text-align: start;
+
+  margin-top: 14px;
+}
+
 input[type="button"],
 input[type="submit"],
 input[type="reset"] {
-  margin-top: 7px;
+  margin-top: 14px;
   font-size: 1em;
 
   min-width: 100px;
